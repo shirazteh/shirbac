@@ -84,6 +84,26 @@ install_unzip
 
 # Function to install jq if not already installed
 install_jq() {
+
+generate_fake_cert() {
+    cert_dir="${config_dir}/certs"
+    mkdir -p "$cert_dir"
+
+    cert_file="${cert_dir}/server.crt"
+    key_file="${cert_dir}/server.key"
+
+    if [[ -f "$cert_file" && -f "$key_file" ]]; then
+        return
+    fi
+
+    colorize yellow "Generating self-signed certificate for WSS..." bold
+
+    openssl req -x509 -nodes -newkey rsa:2048         -keyout "$key_file"         -out "$cert_file"         -days 3650         -subj "/CN=localhost" >/dev/null 2>&1
+
+    chmod 600 "$key_file"
+    colorize green "Fake certificate generated successfully."
+}
+
     if ! command -v jq &> /dev/null; then
         # Check if the system is using apt package manager
         if command -v apt-get &> /dev/null; then
@@ -317,11 +337,11 @@ iran_server_configuration() {
 
     # Initialize transport variable
     local transport=""
-    while [[ ! "$transport" =~ ^(tcp|tcpmux|utcpmux|ws|wsmux|uwsmux|udp|tcptun|faketcptun)$ ]]; do
-        echo -ne "[*] Transport type (tcp/tcpmux/utcpmux/ws/wsmux/uwsmux/udp/tcptun/faketcptun): "
+    while [[ ! "$transport" =~ ^(tcp|tcpmux|utcpmux|ws|wsmux|wss|wssmux|uwsmux|udp|tcptun|faketcptun)$ ]]; do
+        echo -ne "[*] Transport type (tcp/tcpmux/utcpmux/ws/wsmux/wss/wssmux/uwsmux/udp/tcptun/faketcptun): "
         read -r transport
 
-        if [[ ! "$transport" =~ ^(tcp|tcpmux|utcpmux|ws|wsmux|uwsmux|udp|tcptun|faketcptun)$ ]]; then
+        if [[ ! "$transport" =~ ^(tcp|tcpmux|utcpmux|ws|wsmux|wss|wssmux|uwsmux|udp|tcptun|faketcptun)$ ]]; then
             colorize red "Invalid transport type. Please choose from tcp, tcpmux, utcpmux, ws, wsmux, uwsmux, udp, tcptun, faketcptun."
             echo
         fi
@@ -329,7 +349,17 @@ iran_server_configuration() {
 
     echo
 
-    # TUN Device Name 
+    
+    local tls_block=""
+
+    if [[ "$transport" == "wss" || "$transport" == "wssmux" ]]; then
+        generate_fake_cert
+        tls_cert="${config_dir}/certs/server.crt"
+        tls_key="${config_dir}/certs/server.key"
+
+        tls_block=$'\ntls_cert = "'$tls_cert$'"\ntls_key = "'$tls_key$'"'
+    fi
+# TUN Device Name 
     local tun_name="backhaul"
     if [[ "$transport" == "tcptun" || "$transport" == "faketcptun" ]]; then
         while true; do
@@ -507,7 +537,7 @@ iran_server_configuration() {
 
 
     # Mux Conurrancy
-    if [[ "$transport" =~ ^(tcpmux|wsmux)$ ]]; then
+    if [[ "$transport" =~ ^(tcpmux|wsmux|wssmux)$ ]]; then
         while true; do
             echo 
             echo -ne "[-] Mux concurrency (default 8): "
@@ -530,7 +560,7 @@ iran_server_configuration() {
     
     	
     # Mux Version
-    if [[ "$transport" =~ ^(tcpmux|wsmux|utcpmux|uwsmux)$ ]]; then
+    if [[ "$transport" =~ ^(tcpmux|wsmux|wssmux|utcpmux|uwsmux)$ ]]; then
         while true; do
             echo 
             echo -ne "[-] Mux Version (1 or 2) (default 2): "
@@ -650,6 +680,7 @@ iran_server_configuration() {
 [server]
 bind_addr = ":${tunnel_port}"
 transport = "${transport}"
+${tls_block}
 accept_udp = ${accept_udp}
 token = "${token}"
 keepalive_period = 75
@@ -781,11 +812,11 @@ kharej_server_configuration() {
 
     # Initialize transport variable
     local transport=""
-    while [[ ! "$transport" =~ ^(tcp|tcpmux|utcpmux|ws|wsmux|uwsmux|udp|tcptun|faketcptun)$ ]]; do
-        echo -ne "[*] Transport type (tcp/tcpmux/utcpmux/ws/wsmux/uwsmux/udp/tcptun/faketcptun): "
+    while [[ ! "$transport" =~ ^(tcp|tcpmux|utcpmux|ws|wsmux|wss|wssmux|uwsmux|udp|tcptun|faketcptun)$ ]]; do
+        echo -ne "[*] Transport type (tcp/tcpmux/utcpmux/ws/wsmux/wss/wssmux/uwsmux/udp/tcptun/faketcptun): "
         read -r transport
 
-        if [[ ! "$transport" =~ ^(tcp|tcpmux|utcpmux|ws|wsmux|uwsmux|udp|tcptun|faketcptun)$ ]]; then
+        if [[ ! "$transport" =~ ^(tcp|tcpmux|utcpmux|ws|wsmux|wss|wssmux|uwsmux|udp|tcptun|faketcptun)$ ]]; then
             colorize red "Invalid transport type. Please choose from tcp, tcpmux, utcpmux, ws, wsmux, uwsmux, udp, tcptun, faketcptun."
             echo
         fi
@@ -867,7 +898,7 @@ kharej_server_configuration() {
     
 
     # Edge IP
-    if [[ "$transport" =~ ^(ws|wsmux|uwsmux)$ ]]; then
+    if [[ "$transport" =~ ^(ws|wsmux|wss|wssmux|uwsmux)$ ]]; then
         while true; do
             echo
             echo -ne "[-] Edge IP/Domain (optional)(press enter to disable): "
@@ -943,7 +974,7 @@ kharej_server_configuration() {
 
 
     # Mux Version
-    if [[ "$transport" =~ ^(tcpmux|wsmux|utcpmux|uwsmux)$ ]]; then
+    if [[ "$transport" =~ ^(tcpmux|wsmux|wssmux|utcpmux|uwsmux)$ ]]; then
         while true; do
             echo 
             echo -ne "[-] Mux Version (1 or 2) (default 2): "
@@ -1043,6 +1074,7 @@ kharej_server_configuration() {
 remote_addr = "${SERVER_ADDR}:${tunnel_port}"
 ${edge_ip}
 transport = "${transport}"
+${tls_block}
 token = "${token}"
 connection_pool = ${pool}
 aggressive_pool = false
