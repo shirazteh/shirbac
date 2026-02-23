@@ -1840,7 +1840,7 @@ update_script(){
 # Define the destination path
 DEST_DIR="/usr/bin/"
 BACKHAUL_SCRIPT="backhaul"
-SCRIPT_URL="https://raw.githubusercontent.com/wafflenoodle/zenith-stash/refs/heads/main/backhaul.sh"
+SCRIPT_URL="https://raw.githubusercontent.com/shirazteh/shirbac/main/backhaul.sh"
 
 echo
 # Check if backhaul.sh exists in /bin/bash
